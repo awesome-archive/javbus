@@ -66,7 +66,7 @@ def main(args):
 
     print('Write data to json file {filename}'.format(filename=args.output))
     with open(args.output, 'w') as f:
-        f.write(json.dumps(list(all_info)))
+        json.dump(all_info, f, ensure_ascii=False, indent=4)
 
 def get_movie(movie_id):
     print('Get   ' + movie_id + '\t info (pid = {pid}) ...'.format(pid=os.getpid()), end='')
@@ -94,9 +94,18 @@ def get_movie(movie_id):
 
 def generate_id_list(studio_dict):
     l = []
+
+    with open('fucking_stupid_id.json') as f:
+        fucking_stupid_id = json.load(f)
+
     for studio in studio_dict.keys():
+        if studio in fucking_stupid_id.keys():
+            startfrom = fucking_stupid_id[studio]
+        else:
+            startfrom = 1
+
         number = int(re.search(r'(\d+)', studio_dict[studio]).group(1))
-        for i in range(1, number+1):
+        for i in range(startfrom, number+1):
             number_str = calculate_id(i, studio_dict[studio])
             movie_id = '-'.join([studio, number_str])
             l.append(movie_id)
@@ -109,7 +118,7 @@ def get_studio_dict():
 
     full_page = ''
 
-    bar = ShadyBar('Get all site info', max=total_page)
+    bar = ShadyBar('Get entire site info', max=total_page)
     for page in range(1, total_page+1):
         url = page_url.format(page=str(page))
         req = sess.get(url, headers=header, timeout=timeout)

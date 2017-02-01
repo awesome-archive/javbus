@@ -176,6 +176,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', help='Specifies the last results file')
     parser.add_argument('-o', '--output', help='Specifies the output file name, DEFAULT javbus.json', default='javbus.json')
-    parser.add_argument('-p', '--process', help='Number of Subprocess', default=cpu_count())
+    parser.add_argument('-p', '--process', help='Number of Subprocess, DEFAULT cpu_kernel_counts', default=cpu_count())
     args = parser.parse_args()
     main(args)

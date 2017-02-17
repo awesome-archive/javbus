@@ -42,16 +42,16 @@ def main(args):
     global exist_id
     if args.input and os.path.exists(args.input):
         with open(args.input, 'r') as f:
-            all_info.append(json.load(f))
+            all_info.extend(json.load(f))
             exist_id = [info['id'] for info in all_info]
     else:
         print('Did not find last results file {filename}'.format(filename=args.input))
 
+    print('Generate movie id ... ', end='')
     id_list = generate_id_list(get_studio_dict())
     que = queue.Queue()
-    for i in id_list:
-        if i not in exist_id:
-            que.put(i)
+    que.put(set(id_list) - set(exist_id))
+    print('Done')
 
     print('Create process pool, max size = {size} ... '.format(size=args.process), end='')
     p = Pool(args.process)
@@ -66,7 +66,7 @@ def main(args):
 
     print('Write data to json file {filename}'.format(filename=args.output))
     with open(args.output, 'w') as f:
-        json.dump(all_info, f, ensure_ascii=False, indent=4)
+        json.dump(list(all_info), f, ensure_ascii=False, indent=4)
 
 def get_movie(movie_id):
     print('Get   ' + movie_id + '\t info (pid = {pid}) ...'.format(pid=os.getpid()), end='')
@@ -118,19 +118,18 @@ def get_studio_dict():
 
     full_page = ''
 
-    bar = ShadyBar('Get entire site info', max=total_page)
+    page_bar = ShadyBar('Get entire site info', max=total_page)
     for page in range(1, total_page+1):
         url = page_url.format(page=str(page))
         req = sess.get(url, headers=header, timeout=timeout)
         full_page += req.text
         # sleep(1)
-        bar.next()
-    bar.finish()
+        page_bar.next()
+    page_bar.finish()
 
     soup = BeautifulSoup(full_page, 'html.parser')
     movie_boxes = soup.find_all(class_='movie-box')
 
-    print('Generate movie id ... ', end='')
     for movie in movie_boxes:
         tmp = movie['href'].split('/')[-1].split('-')
         if tmp[0] not in studio_dict:
@@ -140,7 +139,6 @@ def get_studio_dict():
             number_in_dict = int(re.search(r'(\d+)', studio_dict[tmp[0]]).group(1))
             if number_in_dict < number_in_movie:
                 studio_dict[tmp[0]] = calculate_id(number_in_movie, studio_dict[tmp[0]])
-    print('Done')
 
     return studio_dict
 
@@ -183,7 +181,7 @@ def get_movie_magnet(soup, info):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input', help='Specifies the last results file')
+    parser.add_argument('-i', '--input', help='Specifies the last results file', default='javbus.json')
     parser.add_argument('-o', '--output', help='Specifies the output file name, DEFAULT javbus.json', default='javbus.json')
     parser.add_argument('-p', '--process', help='Number of Subprocess, DEFAULT cpu_kernel_counts', default=cpu_count())
     args = parser.parse_args()

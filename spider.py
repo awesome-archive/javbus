@@ -36,8 +36,8 @@ header = {
 total_page = 74
 
 all_info = Manager().list()
+undocumented_id = Manager().list()
 exist_id = []
-undocumented_id = []
 
 def main(args):
     if args.input and os.path.exists(args.input):
@@ -86,6 +86,10 @@ def main(args):
     p.join()
     print('All subprocessing done.')
 
+    print('Write data to json file undocumented.json ... ', end='')
+    with open('undocumented.json', 'r') as f:
+        json.dump(list(undocumented_id), f, ensure_ascii=False, indent=4)
+
     print('Write data to json file {filename}'.format(filename=args.output))
     with open(args.output, 'w') as f:
         json.dump(list(all_info), f, ensure_ascii=False, indent=4)
@@ -98,6 +102,7 @@ def get_movie(movie_id):
     req = session.get(url, headers=header, timeout=timeout)
 
     if req.status_code == 404:
+        undocumented_id.append(movie_id)
         end = time.time()
         print('Get {movie_id:<12} info (pid={pid}) {status:<12}, runs {runtime:0.2f} seconds.'.format(
             movie_id=movie_id, pid=os.getpid(), status='Failure(404)', runtime=(end - start)

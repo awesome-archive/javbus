@@ -18,8 +18,8 @@ from multiprocessing import Pool
 from multiprocessing import Manager
 from multiprocessing import cpu_count
 
-import requests
 import argparse
+import requests
 from bs4 import BeautifulSoup
 from progress.bar import ShadyBar
 
@@ -37,20 +37,42 @@ total_page = 74
 
 all_info = Manager().list()
 exist_id = []
+undocumented_id = []
 
 def main(args):
-    global exist_id
     if args.input and os.path.exists(args.input):
         with open(args.input, 'r') as f:
-            all_info.extend(json.load(f))
-            exist_id = [info['id'] for info in all_info]
+            try:
+                jsonfile = json.load(f)
+            except json.JSONDecodeError:
+                print('Invalid last results json file!')
+            else:
+                all_info.extend(jsonfile)
+                exist_id.extend([info['id'] for info in all_info])
+            finally:
+                print('{length} movies exsited.'.format(length=len(exist_id)))
     else:
         print('Did not find last results file {filename}'.format(filename=args.input))
+
+    if os.path.exists('undocumented.json'):
+        with open('undocumented.json', 'r') as f:
+            try:
+                jsonfile = json.load(f)
+            except json.JSONDecodeError:
+                print('Invalid undocumented json file.')
+            else:
+                undocumented_id.extend([movie_id for movie_id in jsonfile])
+            finally:
+                print('{length} info undocumented.'.format(length=len(undocumented_id)))
+    else:
+        print('Did not find last results file `undocumented.json`')
 
     print('Generate movie id ... ', end='')
     id_list = generate_id_list(get_studio_dict())
     que = queue.Queue()
-    que.put(set(id_list) - set(exist_id))
+    for movie_id in id_list:
+        if movie_id not in exist_id or movie_id not in undocumented_id:
+            que.put(movie_id)
     print('Done')
 
     print('Create process pool, max size = {size} ... '.format(size=args.process), end='')
@@ -69,16 +91,17 @@ def main(args):
         json.dump(list(all_info), f, ensure_ascii=False, indent=4)
 
 def get_movie(movie_id):
-    print('Get   ' + movie_id + '\t info (pid = {pid}) ...'.format(pid=os.getpid()), end='')
     start = time.time()
 
     url = detail_url.format(id=movie_id)
-    sess = requests.Session()
-    req = sess.get(url, headers=header, timeout=timeout)
+    session = requests.Session()
+    req = session.get(url, headers=header, timeout=timeout)
 
     if req.status_code == 404:
         end = time.time()
-        print('Failed(404), runs {runtime:0.2f} seconds.'.format(runtime=(end - start)))
+        print('Get {movie_id:<12} info (pid={pid}) {status:<12}, runs {runtime:0.2f} seconds.'.format(
+            movie_id=movie_id, pid=os.getpid(), status='Failure(404)', runtime=(end - start)
+            ))
         return
 
     soup = BeautifulSoup(req.text, 'html.parser')
@@ -86,11 +109,11 @@ def get_movie(movie_id):
     magnet = get_movie_magnet(soup, info)
     info['magnet'] = magnet
 
-    global all_info
     all_info.append(info)
 
     end = time.time()
-    print('Done, runs {runtime:0.2f} seconds.'.format(runtime=(end-start)))
+    print('Get {movie_id:<12} info (pid={pid}) {status:<12}, runs {runtime:0.2f} seconds.'.format(
+        movie_id=movie_id, pid=os.getpid(), status='Success', runtime=(end-start)))
 
 def generate_id_list(studio_dict):
     l = []
@@ -160,6 +183,9 @@ def get_movie_info(soup):
         'genre':          [a.text for a in movie_info.find_all('a') if a['href'].startswith('https://www.javbus.in/genre/')],
         'star':           [a.text for a in movie_info.find_all('a') if a['href'].startswith('https://www.javbus.in/star/')],
     }
+
+    info['genre'] = list(set(info['genre']))
+    info['star'] = list(set(info['star']))
 
     return info
 

@@ -87,7 +87,7 @@ def main(args):
     print('All subprocessing done.')
 
     print('Write data to json file undocumented.json ... ', end='')
-    with open('undocumented.json', 'r') as f:
+    with open('undocumented.json', 'w') as f:
         json.dump(list(undocumented_id), f, ensure_ascii=False, indent=4)
 
     print('Write data to json file {filename}'.format(filename=args.output))
